@@ -1,0 +1,65 @@
+{% extends 'attendance/base.html' %}
+
+{% block title %}Отчеты{% endblock %}
+{% block page_title %}Отчеты по посещаемости{% endblock %}
+
+{% block content %}
+    <nav>
+        <a href="{% url 'dashboard' %}" class="btn">← Назад</a>
+    </nav>
+
+    <h2>Отчеты по посещаемости</h2>
+
+    <form method="get" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 4px;">
+        <div style="display: flex; gap: 15px; align-items: end;">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label for="start_date">Дата начала:</label>
+                <input type="date" name="start_date" id="start_date" value="{{ start_date }}">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label for="end_date">Дата окончания:</label>
+                <input type="date" name="end_date" id="end_date" value="{{ end_date }}">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label for="user_id">Работник:</label>
+                <select name="user_id" id="user_id">
+                    <option value="">Все работники</option>
+                    {% for user in users %}
+                        <option value="{{ user.id }}" {% if user_id == user.id|stringformat:'s' %}selected{% endif %}>
+                            {{ user.full_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn">Фильтровать</button>
+        </div>
+    </form>
+
+    <h3>Статистика по работникам</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>ФИО</th>
+                <th>Должность</th>
+                <th>Всего дней</th>
+                <th>Всего часов</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for stat in users_stats %}
+                <tr>
+                    <td>{{ stat.user.full_name }}</td>
+                    <td>{{ stat.user.position }}</td>
+                    <td>{{ stat.total_days }}</td>
+                    <td>{{ stat.total_hours|floatformat:2 }} ч</td>
+                    <td><a href="{% url 'user_detail' stat.user.id %}" class="btn">Подробно</a></td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if not users_stats %}
+        <p>Нет данных для отображения. Выберите период и/или работника.</p>
+    {% endif %}
+{% endblock %}

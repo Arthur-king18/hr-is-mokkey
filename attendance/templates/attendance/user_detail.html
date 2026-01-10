@@ -1,0 +1,58 @@
+{% extends 'attendance/base.html' %}
+
+{% block title %}Информация о работнике{% endblock %}
+{% block page_title %}Информация о работнике{% endblock %}
+
+{% block content %}
+    <nav>
+        <a href="{% url 'dashboard' %}" class="btn">← Назад</a>
+        <a href="{% url 'reports' %}" class="btn">Отчеты</a>
+    </nav>
+
+    <h2>Информация о работнике: {{ selected_user.full_name }}</h2>
+
+    <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 4px;">
+        <strong>Должность:</strong> {{ selected_user.position }}<br>
+        <strong>Роль:</strong> {{ selected_user.get_role_display }}<br>
+        <strong>Всего часов в этом месяце:</strong> {{ total_hours }} ч<br>
+        <strong>Всего дней в этом месяце:</strong> {{ total_days }}
+    </div>
+
+    <h3>История посещаемости</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Приход</th>
+                <th>Уход</th>
+                <th>Часы работы</th>
+                <th>Статус</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for attendance in attendances %}
+                <tr>
+                    <td>{{ attendance.check_in|date:"d.m.Y" }}</td>
+                    <td>{{ attendance.check_in|date:"H:i" }}</td>
+                    <td>
+                        {% if attendance.check_out %}
+                            {{ attendance.check_out|date:"H:i" }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if attendance.get_work_duration %}
+                            {{ attendance.get_work_duration }} ч
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td class="{% if attendance.is_present %}status-present{% else %}status-away{% endif %}">
+                        {{ attendance.status }}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

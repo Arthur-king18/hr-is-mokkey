@@ -1,0 +1,46 @@
+{% extends 'attendance/base.html' %}
+
+{% block title %}Вход в систему{% endblock %}
+{% block page_title %}Вход в систему посещаемости{% endblock %}
+
+{% block content %}
+    <h2>Вход в систему посещаемости</h2>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="form-group">
+            <label for="{{ form.username.id_for_label }}">Имя пользователя:</label>
+            {{ form.username }}
+            {% if form.username.errors %}
+                <div class="alert alert-error">
+                    {% for error in form.username.errors %}
+                        {{ error }}
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.password.id_for_label }}">Пароль:</label>
+            {{ form.password }}
+            {% if form.password.errors %}
+                <div class="alert alert-error">
+                    {% for error in form.password.errors %}
+                        {{ error }}
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+
+        {% if form.non_field_errors %}
+            <div class="alert alert-error">
+                {% for error in form.non_field_errors %}
+                    {{ error }}
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <button type="submit" class="btn">Войти</button>
+    </form>
+{% endblock %}
