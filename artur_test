@@ -1,0 +1,229 @@
+import datetime
+from django.test import TestCase, Client
+from django.contrib.auth import get_user_model
+from django.urls import reverse
+from django.utils import timezone
+from attendance.models import Attendance
+
+User = get_user_model()
+
+
+class ArturViewsTest(TestCase):
+
+    def setUp(self):
+        """Создание тестовых данных"""
+        self.client = Client()
+        self.admin = User.objects.create_user(
+            username='admin_test',
+            full_name='Админ Тестовый',
+            position='Администратор',
+            role='admin'
+        )
+        self.worker = User.objects.create_user(
+            username='worker_test',
+            full_name='Рабочий Тестовый',
+            position='Рабочий',
+            role='worker'
+        )
+
+    def test_dashboard_admin_view(self):
+        """Тест главной страницы для администратора"""
+        self.client.login(username='admin_test', password=self.admin.password)
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Админ Тестовый')
+        self.assertContains(response, 'Главная страница')
+
+    def test_dashboard_worker_view(self):
+        """Тест главной страницы для работника"""
+        self.client.login(username='worker_test', password=self.worker.password)
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Рабочий Тестовый')
+        # Работник не должен видеть информацию о других пользователях
+        self.assertNotContains(response, 'Админ Тестовый')
+
+    def test_check_in_creates_attendance(self):
+        """Тест создания записи посещаемости при приходе"""
+        self.client.login(username='worker_test', password=self.worker.password)
+
+        # Отправляем запрос на приход
+        response = self.client.post(reverse('check_in_out'), {'action': 'check_in'})
+
+        # Проверяем редирект
+        self.assertEqual(response.status_code, 302)
+
+        # Проверяем создание записи
+        attendance = Attendance.objects.filter(user=self.worker, is_present=True).first()
+        self.assertIsNotNone(attendance)
+        self.assertIsNotNone(attendance.check_in)
+
+    def test_check_out_updates_attendance(self):
+        """Тест обновления записи при уходе"""
+        self.client.login(username='worker_test', password=self.worker.password)
+
+        # Сначала приход
+        self.client.post(reverse('check_in_out'), {'action': 'check_in'})
+
+        # Затем уход
+        response = self.client.post(reverse('check_in_out'), {'action': 'check_out'})
+
+        # Проверяем редирект
+        self.assertEqual(response.status_code, 302)
+
+        # Проверяем обновление записи
+        attendance = Attendance.objects.filter(user=self.worker).last()
+        self.assertIsNotNone(attendance.check_out)
+        self.assertFalse(attendance.is_present)
+
+    def test_user_detail_admin_access(self):
+        """Тест доступа к детальной информации о пользователе для админа"""
+        self.client.login(username='admin_test', password=self.admin.password)
+        response = self.client.get(reverse('user_detail', kwargs={'user_id': self.worker.id}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Рабочий Тестовый')
+
+    def test_user_detail_worker_denied(self):
+        """Тест запрета доступа к детальной информации для работника"""
+        self.client.login(username='worker_test', password=self.worker.password)
+        response = self.client.get(reverse('user_detail', kwargs={'user_id': self.admin.id}))
+
+        # Работник должен быть перенаправлен
+        self.assertEqual(response.status_code, 302)
+
+    def test_reports_admin_access(self):
+        """Тест доступа к отчетам для админа"""
+        self.client.login(username='admin_test', password=self.admin.password)
+        response = self.client.get(reverse('reports'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Отчеты по посещаемости')
+
+    def test_reports_worker_denied(self):
+        """Тест запрета доступа к отчетам для работника"""
+        self.client.login(username='worker_test', password=self.worker.password)
+        response = self.client.get(reverse('reports'))
+
+        # Работник должен быть перенаправлен
+        self.assertEqual(response.status_code, 302)
+
+    def test_current_time_display(self):
+        """Тест отображения текущего времени на главной странице"""
+        self.client.login(username='worker_test', password=self.worker.password)
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        # Проверяем что время отображается в правильном формате
+        self.assertContains(response, 'Текущее время')
+
+
+class ArturSettingsTest(TestCase):
+    """Тесты для настроек проекта Артура"""
+
+    def test_timezone_setting(self):
+        """Тест настройки часового пояса"""
+        from django.conf import settings
+        # Проверяем что часовой пояс установлен правильно
+        self.assertEqual(settings.TIME_ZONE, 'Europe/Samara')
+
+    def test_language_setting(self):
+        """Тест настройки языка"""
+        from django.conf import settings
+        self.assertEqual(settings.LANGUAGE_CODE, 'ru-ru')
+
+    def test_custom_user_model(self):
+        """Тест использования кастомной модели пользователя"""
+        from django.conf import settings
+        self.assertEqual(settings.AUTH_USER_MODEL, 'attendance.User')
+
+    def test_timezone_awareness(self):
+        """Тест работы с часовыми поясами"""
+        from django.utils import timezone
+        now = timezone.now()
+        # Проверяем что время имеет правильный часовой пояс
+        self.assertIsNotNone(now.tzinfo)
+
+
+class ArturURLTest(TestCase):
+    """Тесты для URL маршрутов Артура"""
+
+    def test_dashboard_url(self):
+        """Тест URL главной страницы"""
+        url = reverse('dashboard')
+        self.assertEqual(url, '/')
+
+    def test_check_in_out_url(self):
+        """Тест URL прихода/ухода"""
+        url = reverse('check_in_out')
+        self.assertEqual(url, '/check-in-out/')
+
+    def test_user_detail_url(self):
+        """Тест URL детальной информации о пользователе"""
+        url = reverse('user_detail', kwargs={'user_id': 1})
+        self.assertEqual(url, '/user/1/')
+
+    def test_reports_url(self):
+        """Тест URL отчетов"""
+        url = reverse('reports')
+        self.assertEqual(url, '/reports/')
+
+    def test_login_url(self):
+        """Тест URL входа"""
+        url = reverse('login')
+        self.assertEqual(url, '/login/')
+
+    def test_logout_url(self):
+        """Тест URL выхода"""
+        url = reverse('logout')
+        self.assertEqual(url, '/logout/')
+
+
+class ArturTemplateTest(TestCase):
+    """Тесты для шаблонов Артура"""
+
+    def setUp(self):
+        self.client = Client()
+        self.worker = User.objects.create_user(
+            username='template_test',
+            full_name='Тест Шаблонов',
+            position='Тестировщик',
+            role='worker'
+        )
+
+    def test_base_template_structure(self):
+        """Тест структуры базового шаблона"""
+        self.client.login(username='template_test', password=self.worker.password)
+        response = self.client.get(reverse('dashboard'))
+
+        # Проверяем наличие основных элементов
+        self.assertContains(response, '<!DOCTYPE html>')
+        self.assertContains(response, '<title>')
+        self.assertContains(response, 'Система посещаемости')
+        self.assertContains(response, 'Выход')
+
+    def test_role_based_navigation(self):
+        """Тест навигации в зависимости от роли"""
+        # Тест для работника
+        self.client.login(username='template_test', password=self.worker.password)
+        response = self.client.get(reverse('dashboard'))
+
+        # Работник должен видеть кнопки прихода/ухода
+        self.assertContains(response, 'Пришел на работу')
+        self.assertContains(response, 'Ушел с работы')
+        # Но не должен видеть ссылку на отчеты
+        self.assertNotContains(response, 'Отчеты')
+
+    def test_time_display_format(self):
+        """Тест формата отображения времени"""
+        self.client.login(username='template_test', password=self.worker.password)
+        response = self.client.get(reverse('dashboard'))
+
+        # Проверяем что время отображается
+        self.assertContains(response, 'Текущее время')
+        # И имеет правильный формат
+        current_time = timezone.now().strftime('%d.%m.%Y %H:%M:%S')
+        # Проверяем что есть элементы времени (не проверяем точное совпадение из-за секунд)
+        self.assertContains(response, timezone.now().strftime('%d.%m.%Y'))
